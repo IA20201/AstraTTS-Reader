@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AstraTTS Reader 设置</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 24px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      max-width: 480px;
+    }
+    h2 { color: #89b4fa; margin-bottom: 20px; }
+    label { display: block; margin: 14px 0 4px; font-size: 13px; color: #a6adc8; }
+    input[type="text"], select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #45475a;
+      border-radius: 6px;
+      background: #313244;
+      color: #cdd6f4;
+      font-size: 14px;
+    }
+    input[type="text"]:focus { border-color: #89b4fa; outline: none; }
+    select { cursor: pointer; }
+    .row { display: flex; align-items: center; gap: 10px; }
+    input[type="range"] { flex: 1; accent-color: #89b4fa; }
+    .val { min-width: 32px; text-align: right; font-size: 13px; color: #a6adc8; }
+    .toggle { display: flex; align-items: center; justify-content: space-between; margin: 12px 0; }
+    .toggle input { accent-color: #89b4fa; }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #saveBtn { background: #89b4fa; color: #1e1e2e; }
+    #saveBtn:hover { background: #74c7ec; }
+    #stopBtn { background: #45475a; color: #f38ba8; margin-top: 8px; }
+    .status { margin-top: 10px; text-align: center; font-size: 13px; color: #a6e3a1; min-height: 20px; }
+    .section { border-top: 1px solid #313244; margin-top: 16px; padding-top: 16px; }
+    .hint { font-size: 11px; color: #585b70; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <h2>AstraTTS Reader 设置</h2>
+
+  <label>API 模式</label>
+  <select id="apiMode">
+    <option value="astra">AstraTTS 原生</option>
+    <option value="openai">OpenAI 兼容</option>
+  </select>
+  <div class="hint" id="modeHint">使用 /api/tts/predict，支持音色选择</div>
+
+  <label>服务地址</label>
+  <input type="text" id="apiUrl" placeholder="http://localhost:5000">
+
+  <div class="astra-field">
+    <label>音色 ID (Avatar)</label>
+    <input type="text" id="avatarId" placeholder="如 chenxing">
+    <div class="hint">对应 config.yaml 中的 Avatar Id</div>
+  </div>
+
+  <div class="astra-field">
+    <label>参考音频 ID (Reference)</label>
+    <input type="text" id="referenceId" placeholder="如 normal, laugh">
+    <div class="hint">对应 Avatar 下的 Reference Id，留空用默认</div>
+  </div>
+
+  <div class="openai-field" style="display:none">
+    <label>API Key</label>
+    <input type="text" id="apiKey" placeholder="sk-...">
+  </div>
+
+  <div class="openai-field" style="display:none">
+    <label>Voice</label>
+    <input type="text" id="voice" placeholder="voice name">
+  </div>
+
+  <div class="openai-field" style="display:none">
+    <label>Model</label>
+    <input type="text" id="model" placeholder="tts-1">
+  </div>
+
+  <div class="section">
+    <label>语速</label>
+    <div class="row">
+      <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
+      <span class="val" id="speedVal">1.0</span>
+    </div>
+
+    <label>音量</label>
+    <div class="row">
+      <input type="range" id="volume" min="0" max="1" step="0.05" value="1.0">
+      <span class="val" id="volumeVal">1.0</span>
+    </div>
+
+    <div class="toggle">
+      <span>流式播放 (Streaming)</span>
+      <input type="checkbox" id="streamingMode">
+    </div>
+    <div class="toggle">
+      <span>下载模式 (Download)</span>
+      <input type="checkbox" id="downloadMode">
+    </div>
+  </div>
+
+  <button id="saveBtn">保存设置</button>
+  <button id="stopBtn">停止播放</button>
+  <div class="status" id="status"></div>
+
+  <script src="shared/config.js"></script>
+  <script src="shared/settings.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

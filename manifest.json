@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "AstraTTS Reader",
+  "version": "2.2.0",
+  "description": "选中文本朗读，支持 AstraTTS 原生 API 和 OpenAI 兼容格式",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "offscreen",
+    "downloads"
+  ],
+  "host_permissions": [
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*",
+    "http://host.docker.internal:*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AstraTTS Reader"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "icons": {
+    "48": "icons/icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "exclude_matches": [
+        "chrome://*",
+        "chrome-extension://*",
+        "https://chrome.google.com/*",
+        "https://microsoftedge.microsoft.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

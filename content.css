@@ -1,0 +1,41 @@
+/* AstraTTS Reader — 浮动按钮样式 */
+
+#astra-tts-fab {
+  position: absolute;
+  z-index: 2147483647;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(102, 126, 234, 0.4);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#astra-tts-fab.visible {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+#astra-tts-fab:hover {
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.6);
+  transform: scale(1.1);
+}
+
+#astra-tts-fab.clicked {
+  transform: scale(0.9);
+}
+
+#astra-tts-fab svg {
+  pointer-events: none;
+}
