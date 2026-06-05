@@ -11,22 +11,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     volume:   document.getElementById('volume'),
     avatarId: document.getElementById('avatarId'),
     referenceId: document.getElementById('referenceId'),
-    streamingMode: document.getElementById('streamingMode'),
-    downloadMode:  document.getElementById('downloadMode'),
   };
 
-  const speedVal  = document.getElementById('speedVal');
+  const speedVal = document.getElementById('speedVal');
   const volumeVal = document.getElementById('volumeVal');
-  const status    = document.getElementById('status');
-  const modeHint  = document.getElementById('modeHint');
+  const status   = document.getElementById('status');
+  const modeHint = document.getElementById('modeHint');
 
-  // 初始化
   await initForm(el);
   speedVal.textContent  = el.speed.value;
   volumeVal.textContent = el.volume.value;
   updateHint(el.apiMode.value);
 
-  // 事件
   el.speed.oninput  = () => { speedVal.textContent = el.speed.value; };
   el.volume.oninput = () => { volumeVal.textContent = el.volume.value; };
 
@@ -39,15 +35,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (mode === 'openai' && !el.apiUrl.value.includes('/v1')) {
       el.apiUrl.value = el.apiUrl.value.replace(/\/+$/, '') + '/v1';
     }
-  };
-
-  el.streamingMode.onchange = async () => {
-    if (el.streamingMode.checked) el.downloadMode.checked = false;
-    await chrome.storage.local.set({ streamingMode: el.streamingMode.checked, downloadMode: el.downloadMode.checked });
-  };
-  el.downloadMode.onchange = async () => {
-    if (el.downloadMode.checked) el.streamingMode.checked = false;
-    await chrome.storage.local.set({ streamingMode: el.streamingMode.checked, downloadMode: el.downloadMode.checked });
   };
 
   document.getElementById('saveBtn').onclick = async () => {

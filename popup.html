@@ -80,18 +80,8 @@
       text-align: center;
       min-height: 16px;
     }
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin: 8px 0;
-      font-size: 12px;
-      color: #a6adc8;
-    }
-    .toggle-row input[type="checkbox"] {
-      accent-color: #89b4fa;
-    }
     .section { border-top: 1px solid #313244; margin-top: 10px; padding-top: 10px; }
+    .hint { font-size: 10px; color: #585b70; margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -138,15 +128,7 @@
       <input type="range" id="volume" min="0" max="1" step="0.05" value="1.0">
       <span class="speed-val" id="volumeVal">1.0</span>
     </div>
-
-    <div class="toggle-row">
-      <span>流式播放</span>
-      <input type="checkbox" id="streamingMode">
-    </div>
-    <div class="toggle-row">
-      <span>下载模式</span>
-      <input type="checkbox" id="downloadMode">
-    </div>
+    <div class="hint">流式播放已默认开启</div>
   </div>
 
   <button id="save">保存设置</button>

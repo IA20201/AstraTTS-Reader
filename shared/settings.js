@@ -11,17 +11,14 @@ const DEFAULT_SETTINGS = {
   model: 'tts-1',
   avatarId: '',
   referenceId: '',
-  streamingMode: false,
-  downloadMode: false,
   outputVolume: 1.0
 };
 
 async function loadSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ['apiMode', 'apiUrl', 'apiKey', 'speechSpeed', 'voice', 'model', 'avatarId', 'referenceId', 'streamingMode', 'downloadMode', 'outputVolume'],
+      ['apiMode', 'apiUrl', 'apiKey', 'speechSpeed', 'voice', 'model', 'avatarId', 'referenceId', 'outputVolume'],
       (data) => {
-        // 迁移旧配置
         if (!data.apiMode) {
           const oldUrl = data.apiUrl || '';
           data.apiMode = oldUrl.includes('/v1') ? 'openai' : 'astra';
@@ -38,8 +35,6 @@ async function loadSettings() {
           model: data.model || DEFAULT_SETTINGS.model,
           avatarId: data.avatarId || DEFAULT_SETTINGS.avatarId,
           referenceId: data.referenceId || DEFAULT_SETTINGS.referenceId,
-          streamingMode: data.streamingMode ?? DEFAULT_SETTINGS.streamingMode,
-          downloadMode: data.downloadMode ?? DEFAULT_SETTINGS.downloadMode,
           outputVolume: data.outputVolume ?? DEFAULT_SETTINGS.outputVolume
         });
       }
@@ -54,7 +49,7 @@ async function saveSettings(settings) {
 }
 
 /**
- * 根据 API 模式构建请求参数
+ * 根据 API 模式构建请求参数（标准/下载）
  */
 function buildRequest(settings, text, format = 'wav') {
   const base = settings.apiUrl.replace(/\/+$/, '');
@@ -88,40 +83,6 @@ function buildRequest(settings, text, format = 'wav') {
 }
 
 /**
- * 构建流式请求 (AstraTTS 用 GET+query，OpenAI 用 POST)
- */
-function buildStreamRequest(settings, text) {
-  const base = settings.apiUrl.replace(/\/+$/, '');
-  if (settings.apiMode === 'astra') {
-    const p = new URLSearchParams({ text, speed: settings.speechSpeed });
-    if (settings.avatarId) p.set('avatarId', settings.avatarId);
-    if (settings.referenceId) p.set('referenceId', settings.referenceId);
-    return {
-      endpoint: base + '/api/tts/predict-stream?' + p.toString(),
-      method: 'GET',
-      payload: null,
-      headers: {}
-    };
-  } else {
-    return {
-      endpoint: base + '/audio/speech',
-      method: 'POST',
-      payload: {
-        model: settings.model,
-        input: text,
-        voice: settings.voice,
-        response_format: 'pcm',
-        speed: settings.speechSpeed
-      },
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey}`
-      }
-    };
-  }
-}
-
-/**
  * 初始化 UI 表单
  */
 async function initForm(elements) {
@@ -134,8 +95,6 @@ async function initForm(elements) {
   if (elements.model)    elements.model.value = s.model;
   if (elements.avatarId) elements.avatarId.value = s.avatarId;
   if (elements.referenceId) elements.referenceId.value = s.referenceId;
-  if (elements.streamingMode) elements.streamingMode.checked = s.streamingMode;
-  if (elements.downloadMode)  elements.downloadMode.checked = s.downloadMode;
   if (elements.volume)   elements.volume.value = s.outputVolume;
   toggleModeFields(s.apiMode);
   return s;
@@ -166,8 +125,6 @@ function readForm(elements) {
     model:      (elements.model?.value || '').trim(),
     avatarId:   (elements.avatarId?.value || '').trim(),
     referenceId:(elements.referenceId?.value || '').trim(),
-    streamingMode: elements.streamingMode?.checked || false,
-    downloadMode:  elements.downloadMode?.checked || false,
-    outputVolume:  parseFloat(elements.volume?.value || 1.0)
+    outputVolume: parseFloat(elements.volume?.value || 1.0)
   };
 }

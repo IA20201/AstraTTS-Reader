@@ -27,8 +27,6 @@
     .row { display: flex; align-items: center; gap: 10px; }
     input[type="range"] { flex: 1; accent-color: #89b4fa; }
     .val { min-width: 32px; text-align: right; font-size: 13px; color: #a6adc8; }
-    .toggle { display: flex; align-items: center; justify-content: space-between; margin: 12px 0; }
-    .toggle input { accent-color: #89b4fa; }
     button {
       margin-top: 20px;
       width: 100%;
@@ -99,15 +97,7 @@
       <input type="range" id="volume" min="0" max="1" step="0.05" value="1.0">
       <span class="val" id="volumeVal">1.0</span>
     </div>
-
-    <div class="toggle">
-      <span>流式播放 (Streaming)</span>
-      <input type="checkbox" id="streamingMode">
-    </div>
-    <div class="toggle">
-      <span>下载模式 (Download)</span>
-      <input type="checkbox" id="downloadMode">
-    </div>
+    <div class="hint">流式播放已默认开启</div>
   </div>
 
   <button id="saveBtn">保存设置</button>

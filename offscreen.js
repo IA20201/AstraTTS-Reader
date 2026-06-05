@@ -1,7 +1,6 @@
 // AstraTTS Reader — offscreen document
-// 负责：fetch API + 音频播放（Service Worker 缺少 Audio API）
+// 负责：fetch 流式 API + PCM 音频播放（Service Worker 缺少 Audio API）
 
-let audio = null;
 let audioCtx = null;
 let gainNode = null;
 let nextStartTime = 0;
@@ -11,172 +10,132 @@ let stopRequested = false;
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === 'play') {
-    handlePlay(msg.settings, msg.text, msg.mode);
+    handlePlay(msg.settings, msg.text);
   } else if (msg.action === 'stop') {
     stopAll();
   }
 });
 
-// ── 主流程 ──
+// ── 主流程：流式播放 ──
 
-async function handlePlay(settings, text, mode) {
+async function handlePlay(settings, text) {
   stopRequested = false;
-  
-  if (mode === 'stream') {
-    await playStreaming(settings, text);
-  } else if (mode === 'download') {
-    await downloadAudio(settings, text);
-  } else {
-    await playNormal(settings, text);
-  }
-}
-
-// ── 标准播放 ──
-
-async function playNormal(settings, text) {
-  const { endpoint, payload, headers } = buildRequest(settings, text, 'wav');
-  
-  try {
-    const resp = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    });
-    
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    
-    await playAudioBlob(url, settings.outputVolume ?? 1.0);
-    URL.revokeObjectURL(url);
-    
-    chrome.runtime.sendMessage({ action: 'chunk-done' });
-  } catch (e) {
-    if (!stopRequested) {
-      console.error('Play error:', e);
-      chrome.runtime.sendMessage({ action: 'play-error', error: e.message });
-    }
-  }
-}
-
-function playAudioBlob(url, volume) {
-  return new Promise((resolve) => {
-    if (audio) { audio.pause(); audio = null; }
-    audio = new Audio(url);
-    audio.volume = volume;
-    audio.onended = () => { audio = null; resolve(); };
-    audio.onerror = () => { audio = null; resolve(); };
-    audio.play().catch(() => { audio = null; resolve(); });
-  });
-}
-
-// ── 流式播放 ── [C1 fix] catch 块 return，不再发 chunk-done
-
-async function playStreaming(settings, text) {
   const base = settings.apiUrl.replace(/\/+$/, '');
-  
+  const volume = settings.outputVolume ?? 1.0;
+
   try {
     if (settings.apiMode === 'astra') {
+      // AstraTTS: GET 流式 Float32 PCM
       const p = new URLSearchParams({ text, speed: settings.speechSpeed });
       if (settings.avatarId) p.set('avatarId', settings.avatarId);
       if (settings.referenceId) p.set('referenceId', settings.referenceId);
-      const url = base + '/api/tts/predict-stream?' + p.toString();
-      
-      const resp = await fetch(url);
+      const resp = await fetch(base + '/api/tts/predict-stream?' + p.toString());
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const sampleRate = parseInt(resp.headers.get('X-Audio-Sample-Rate')) || 32000;
-      await playFloat32PCM(resp, sampleRate, settings.outputVolume ?? 1.0);
+      await playFloat32PCM(resp, sampleRate, volume);
     } else {
-      const { endpoint, payload, headers } = buildRequest(settings, text, 'pcm');
-      const resp = await fetch(endpoint, {
+      // OpenAI: POST Int16 PCM
+      const resp = await fetch(base + '/audio/speech', {
         method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.apiKey || 'not-needed'}`
+        },
+        body: JSON.stringify({
+          model: settings.model || 'tts-1',
+          input: text,
+          voice: settings.voice || 'default',
+          response_format: 'pcm',
+          speed: settings.speechSpeed
+        })
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      await playInt16PCM(resp, 24000, settings.outputVolume ?? 1.0);
+      await playInt16PCM(resp, 24000, volume);
     }
   } catch (e) {
     if (!stopRequested) {
       console.error('Stream error:', e);
       chrome.runtime.sendMessage({ action: 'play-error', error: e.message });
     }
-    return; // [C1] 错误时不发 chunk-done
+    return;
   }
-  
+
   if (!stopRequested) {
     chrome.runtime.sendMessage({ action: 'chunk-done' });
   }
 }
 
+// ── Float32 PCM 播放（AstraTTS） ──
+
 async function playFloat32PCM(response, sampleRate, volume) {
-  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close(); // [I3 fix]
+  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
   audioCtx = new AudioContext({ sampleRate });
   gainNode = audioCtx.createGain();
   gainNode.gain.value = volume;
   gainNode.connect(audioCtx.destination);
-  
+
   nextStartTime = audioCtx.currentTime;
   const reader = response.body.getReader();
   let residual = new Uint8Array(0);
-  
+
   while (!stopRequested) {
     const { value, done } = await reader.read();
     if (done) break;
     if (!value) continue;
-    
+
     let combined = mergeBytes(residual, value);
     const alignedLen = combined.length - (combined.length % 4);
     residual = combined.slice(alignedLen);
     if (alignedLen === 0) continue;
-    
+
     const sampleCount = alignedLen / 4;
     const floatData = new Float32Array(sampleCount);
     const view = new DataView(combined.buffer, combined.byteOffset, alignedLen);
     for (let i = 0; i < sampleCount; i++) {
       floatData[i] = view.getFloat32(i * 4, true);
     }
-    
     scheduleBuffer(floatData, sampleRate);
   }
-  
+
   await waitForPlaybackEnd();
 }
 
+// ── Int16 PCM 播放（OpenAI） ──
+
 async function playInt16PCM(response, sampleRate, volume) {
-  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close(); // [I3 fix]
+  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
   audioCtx = new AudioContext({ sampleRate });
   gainNode = audioCtx.createGain();
   gainNode.gain.value = volume;
   gainNode.connect(audioCtx.destination);
-  
+
   nextStartTime = audioCtx.currentTime;
   const reader = response.body.getReader();
   let residual = new Uint8Array(0);
-  
+
   while (!stopRequested) {
     const { value, done } = await reader.read();
     if (done) break;
     if (!value) continue;
-    
+
     let combined = mergeBytes(residual, value);
     const alignedLen = combined.length - (combined.length % 2);
     residual = combined.slice(alignedLen);
     if (alignedLen === 0) continue;
-    
+
     const sampleCount = alignedLen / 2;
     const floatData = new Float32Array(sampleCount);
     const view = new DataView(combined.buffer, combined.byteOffset, alignedLen);
     for (let i = 0; i < sampleCount; i++) {
       floatData[i] = view.getInt16(i * 2, true) / 32768;
     }
-    
     scheduleBuffer(floatData, sampleRate);
   }
-  
+
   await waitForPlaybackEnd();
 }
+
+// ── 工具函数 ──
 
 function mergeBytes(a, b) {
   if (a.length === 0) return b;
@@ -190,11 +149,11 @@ function scheduleBuffer(floatData, sampleRate) {
   if (!audioCtx) return;
   const buf = audioCtx.createBuffer(1, floatData.length, sampleRate);
   buf.getChannelData(0).set(floatData);
-  
+
   const src = audioCtx.createBufferSource();
   src.buffer = buf;
   src.connect(gainNode);
-  
+
   const now = audioCtx.currentTime;
   if (nextStartTime < now) nextStartTime = now;
   src.start(nextStartTime);
@@ -215,72 +174,10 @@ function waitForPlaybackEnd() {
   });
 }
 
-// ── 下载 ──
-
-async function downloadAudio(settings, text) {
-  const { endpoint, payload, headers } = buildRequest(settings, text, 'wav');
-  try {
-    const resp = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const ext = settings.apiMode === 'astra' ? 'wav' : 'mp3';
-    chrome.downloads.download({
-      url,
-      filename: `tts-${ts}.${ext}`,
-      saveAs: true
-    }, () => URL.revokeObjectURL(url));
-    if (!stopRequested) chrome.runtime.sendMessage({ action: 'chunk-done' });
-  } catch (e) {
-    if (!stopRequested) {
-      console.error('Download error:', e);
-      chrome.runtime.sendMessage({ action: 'play-error', error: e.message });
-    }
-  }
-}
-
-// ── 停止 ──
-
 function stopAll() {
   stopRequested = true;
-  if (audio) { audio.pause(); audio = null; }
-  if (audioCtx && audioCtx.state !== 'closed') { audioCtx.close(); audioCtx = null; }
-}
-
-// ── 请求构建 ── [C3 fix] 唯一定义，不再与 background.js 重复
-
-function buildRequest(settings, text, format) {
-  const base = settings.apiUrl.replace(/\/+$/, '');
-  if (settings.apiMode === 'astra') {
-    return {
-      endpoint: base + '/api/tts/predict',
-      payload: {
-        text,
-        speed: settings.speechSpeed,
-        ...(settings.avatarId && { avatarId: settings.avatarId }),
-        ...(settings.referenceId && { referenceId: settings.referenceId })
-      },
-      headers: { 'Content-Type': 'application/json' }
-    };
-  } else {
-    return {
-      endpoint: base + '/audio/speech',
-      payload: {
-        model: settings.model || 'tts-1',
-        input: text,
-        voice: settings.voice || 'default',
-        response_format: format,
-        speed: settings.speechSpeed
-      },
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey || 'not-needed'}`
-      }
-    };
+  if (audioCtx && audioCtx.state !== 'closed') {
+    audioCtx.close();
+    audioCtx = null;
   }
 }
