@@ -43,12 +43,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  // 流式/下载互斥
-  el.streamingMode.onchange = () => {
+  // 流式/下载互斥 + 自动保存
+  el.streamingMode.onchange = async () => {
     if (el.streamingMode.checked) el.downloadMode.checked = false;
+    await chrome.storage.local.set({ streamingMode: el.streamingMode.checked, downloadMode: el.downloadMode.checked });
   };
-  el.downloadMode.onchange = () => {
+  el.downloadMode.onchange = async () => {
     if (el.downloadMode.checked) el.streamingMode.checked = false;
+    await chrome.storage.local.set({ streamingMode: el.streamingMode.checked, downloadMode: el.downloadMode.checked });
   };
 
   // 保存

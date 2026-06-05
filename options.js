@@ -41,11 +41,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  el.streamingMode.onchange = () => {
+  el.streamingMode.onchange = async () => {
     if (el.streamingMode.checked) el.downloadMode.checked = false;
+    await chrome.storage.local.set({ streamingMode: el.streamingMode.checked, downloadMode: el.downloadMode.checked });
   };
-  el.downloadMode.onchange = () => {
+  el.downloadMode.onchange = async () => {
     if (el.downloadMode.checked) el.streamingMode.checked = false;
+    await chrome.storage.local.set({ streamingMode: el.streamingMode.checked, downloadMode: el.downloadMode.checked });
   };
 
   document.getElementById('saveBtn').onclick = async () => {
