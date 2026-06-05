@@ -1,7 +1,7 @@
 /* AstraTTS Reader — 浮动按钮样式 */
 
 #astra-tts-fab {
-  position: absolute;
+  position: fixed;
   z-index: 2147483647;
   width: 40px;
   height: 40px;
