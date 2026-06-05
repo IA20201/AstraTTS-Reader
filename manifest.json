@@ -32,16 +32,7 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      "exclude_matches": [
-        "chrome://*",
-        "chrome-extension://*",
-        "https://chrome.google.com/*",
-        "https://microsoftedge.microsoft.com/*"
-      ],
+      "matches": ["http://*/*", "https://*/*"],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
