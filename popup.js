@@ -49,6 +49,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => { status.textContent = ''; }, 2000);
   };
 
+  // ── 运行状态显示 ──
+  const runtimeSection = document.getElementById('runtimeSection');
+  const runtimeInfo = document.getElementById('runtimeInfo');
+
+  function updateRuntime() {
+    chrome.runtime.sendMessage({ action: 'get-runtime-status' }, (resp) => {
+      if (chrome.runtime.lastError || !resp || !resp.data) {
+        runtimeSection.style.display = 'none';
+        return;
+      }
+      const d = resp.data;
+      runtimeSection.style.display = '';
+      runtimeInfo.innerHTML = [
+        d.avatarId && `音色: <b>${d.avatarId}</b> / ${d.referenceId}`,
+        d.speed && `语速: ${d.speed}x`,
+        d.textLength && `字数: ${d.textLength}`,
+        d.sampleRate && `采样率: ${d.sampleRate} Hz`,
+      ].filter(Boolean).join('<br>');
+    });
+  }
+
+  // 打开时刷新一次，之后每秒刷新
+  updateRuntime();
+  setInterval(updateRuntime, 1000);
+
   function updateBadge(mode) {
     modeBadge.textContent = mode === 'astra' ? 'AstraTTS' : 'OpenAI';
     modeBadge.className = 'badge ' + mode;

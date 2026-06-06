@@ -87,18 +87,28 @@ async function ensureOffscreen() {
   }
 }
 
-// ── 播放控制（默认流式） ──
+// ── 播放控制 ──
 
 let isPlaying = false;
+let runtimeStatus = {};
 
 async function startPlayback(text) {
   const settings = await getSettings();
+  runtimeStatus = {}; // 重置运行状态
+
+  try {
+    await ensureOffscreen();
+  } catch (e) {
+    console.error('Failed to create offscreen:', e);
+    setBadge('!', '#F44336', '初始化失败');
+    return;
+  }
+
   isPlaying = true;
   setBadge('▶', '#4CAF50', '流式朗读中');
   chrome.contextMenus.update('tts-read', { visible: false });
   chrome.contextMenus.update('tts-stop', { visible: true });
 
-  await ensureOffscreen();
   chrome.runtime.sendMessage({
     action: 'play',
     settings,
@@ -125,9 +135,9 @@ function cleanup() {
   }
 }
 
-// ── 来自 content script 和 offscreen 的消息 ──
+// ── 消息处理 ──
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'tts-read' && msg.text) {
     startPlayback(msg.text);
   } else if (msg.action === 'chunk-done' || msg.action === 'stream-ended') {
@@ -137,5 +147,10 @@ chrome.runtime.onMessage.addListener((msg) => {
     cleanup();
   } else if (msg.action === 'stop') {
     stopPlayback();
+  } else if (msg.action === 'runtime-status') {
+    runtimeStatus = { ...runtimeStatus, ...msg.data };
+  } else if (msg.action === 'get-runtime-status') {
+    sendResponse({ data: runtimeStatus });
+    return true;
   }
 });

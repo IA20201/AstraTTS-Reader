@@ -5,6 +5,7 @@ let audioCtx = null;
 let gainNode = null;
 let nextStartTime = 0;
 let stopRequested = false;
+let isFirstBuffer = true;
 
 // ── 消息入口 ──
 
@@ -16,7 +17,26 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
-// ── 主流程：流式播放 ──
+// ── AudioContext 管理 ──
+
+async function closeAudioCtx() {
+  if (audioCtx && audioCtx.state !== 'closed') {
+    try { await audioCtx.close(); } catch (e) { /* ignore */ }
+  }
+  audioCtx = null;
+  gainNode = null;
+}
+
+function createAudioCtx(sampleRate, volume) {
+  audioCtx = new AudioContext({ sampleRate });
+  gainNode = audioCtx.createGain();
+  gainNode.gain.value = volume;
+  gainNode.connect(audioCtx.destination);
+  nextStartTime = audioCtx.currentTime + 0.15;
+  isFirstBuffer = true;
+}
+
+// ── 主流程 ──
 
 async function handlePlay(settings, text) {
   stopRequested = false;
@@ -25,7 +45,6 @@ async function handlePlay(settings, text) {
 
   try {
     if (settings.apiMode === 'astra') {
-      // AstraTTS: GET 流式 Float32 PCM
       const params = new URLSearchParams({
         text,
         speed: settings.speechSpeed,
@@ -35,9 +54,19 @@ async function handlePlay(settings, text) {
       const resp = await fetch(base + '/api/tts/predict-stream?' + params.toString());
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const sampleRate = parseInt(resp.headers.get('X-Audio-Sample-Rate')) || 32000;
-      await playFloat32PCM(resp, sampleRate, volume);
+      chrome.runtime.sendMessage({
+        action: 'runtime-status',
+        data: {
+          apiMode: 'astra',
+          avatarId: settings.avatarId || '(default)',
+          referenceId: settings.referenceId || '(default)',
+          speed: settings.speechSpeed,
+          volume, sampleRate,
+          textLength: text.length
+        }
+      });
+      await playPCM(resp, sampleRate, volume, true);
     } else {
-      // OpenAI: POST Int16 PCM
       const resp = await fetch(base + '/audio/speech', {
         method: 'POST',
         headers: {
@@ -53,7 +82,7 @@ async function handlePlay(settings, text) {
         })
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      await playInt16PCM(resp, 24000, volume);
+      await playPCM(resp, 24000, volume, false);
     }
   } catch (e) {
     if (!stopRequested) {
@@ -68,20 +97,16 @@ async function handlePlay(settings, text) {
   }
 }
 
-// ── Float32 PCM 播放（AstraTTS） ──
+// ── 通用 PCM 流式播放 ──
 
-async function playFloat32PCM(response, sampleRate, volume) {
-  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
-  audioCtx = new AudioContext({ sampleRate });
-  gainNode = audioCtx.createGain();
-  gainNode.gain.value = volume;
-  gainNode.connect(audioCtx.destination);
+async function playPCM(response, sampleRate, volume, isFloat32) {
+  await closeAudioCtx();
+  createAudioCtx(sampleRate, volume);
 
-  nextStartTime = audioCtx.currentTime;
+  const bytesPerSample = isFloat32 ? 4 : 2;
+  const minBytes = sampleRate * bytesPerSample * 0.3;
   const reader = response.body.getReader();
   let residual = new Uint8Array(0);
-  // 积累至少 0.5 秒数据再调度，减少 buffer 数量
-  const minBytes = sampleRate * 4 * 0.5;
 
   while (!stopRequested) {
     const { value, done } = await reader.read();
@@ -89,105 +114,60 @@ async function playFloat32PCM(response, sampleRate, volume) {
     if (!value) continue;
 
     residual = mergeBytes(residual, value);
-    if (!done && residual.length < minBytes) continue;
+    if (residual.length < minBytes) continue;
 
-    const alignedLen = residual.length - (residual.length % 4);
+    const alignedLen = residual.length - (residual.length % bytesPerSample);
     if (alignedLen === 0) continue;
-    const leftover = residual.slice(alignedLen);
-    const combined = residual;
-    residual = leftover;
 
-    const sampleCount = alignedLen / 4;
-    const floatData = new Float32Array(sampleCount);
-    const view = new DataView(combined.buffer, combined.byteOffset, alignedLen);
-    for (let i = 0; i < sampleCount; i++) {
-      floatData[i] = view.getFloat32(i * 4, true);
-    }
-    scheduleBuffer(floatData, sampleRate);
+    const chunk = new Uint8Array(residual.buffer, residual.byteOffset, alignedLen);
+    residual = residual.slice(alignedLen);
+
+    scheduleSamples(chunk, sampleRate, isFloat32);
   }
-  // 处理剩余数据
-  if (!stopRequested && residual.length >= 4) {
-    const alignedLen = residual.length - (residual.length % 4);
+
+  // 处理剩余
+  if (!stopRequested && residual.length >= bytesPerSample) {
+    const alignedLen = residual.length - (residual.length % bytesPerSample);
     if (alignedLen > 0) {
-      const sampleCount = alignedLen / 4;
-      const floatData = new Float32Array(sampleCount);
-      const view = new DataView(residual.buffer, residual.byteOffset, alignedLen);
-      for (let i = 0; i < sampleCount; i++) {
-        floatData[i] = view.getFloat32(i * 4, true);
-      }
-      scheduleBuffer(floatData, sampleRate);
+      const chunk = new Uint8Array(residual.buffer, residual.byteOffset, alignedLen);
+      scheduleSamples(chunk, sampleRate, isFloat32);
     }
   }
 
   await waitForPlaybackEnd();
 }
 
-// ── Int16 PCM 播放（OpenAI） ──
+function scheduleSamples(chunk, sampleRate, isFloat32) {
+  const bytesPerSample = isFloat32 ? 4 : 2;
+  const sampleCount = chunk.length / bytesPerSample;
+  const floatData = new Float32Array(sampleCount);
+  const view = new DataView(chunk.buffer, chunk.byteOffset, chunk.length);
 
-async function playInt16PCM(response, sampleRate, volume) {
-  if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
-  audioCtx = new AudioContext({ sampleRate });
-  gainNode = audioCtx.createGain();
-  gainNode.gain.value = volume;
-  gainNode.connect(audioCtx.destination);
-
-  nextStartTime = audioCtx.currentTime;
-  const reader = response.body.getReader();
-  let residual = new Uint8Array(0);
-  const minBytes = sampleRate * 2 * 0.5;
-
-  while (!stopRequested) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-
-    residual = mergeBytes(residual, value);
-    if (!done && residual.length < minBytes) continue;
-
-    const alignedLen = residual.length - (residual.length % 2);
-    if (alignedLen === 0) continue;
-    const leftover = residual.slice(alignedLen);
-    const combined = residual;
-    residual = leftover;
-
-    const sampleCount = alignedLen / 2;
-    const floatData = new Float32Array(sampleCount);
-    const view = new DataView(combined.buffer, combined.byteOffset, alignedLen);
-    for (let i = 0; i < sampleCount; i++) {
-      floatData[i] = view.getInt16(i * 2, true) / 32768;
-    }
-    scheduleBuffer(floatData, sampleRate);
-  }
-  if (!stopRequested && residual.length >= 2) {
-    const alignedLen = residual.length - (residual.length % 2);
-    if (alignedLen > 0) {
-      const sampleCount = alignedLen / 2;
-      const floatData = new Float32Array(sampleCount);
-      const view = new DataView(residual.buffer, residual.byteOffset, alignedLen);
-      for (let i = 0; i < sampleCount; i++) {
-        floatData[i] = view.getInt16(i * 2, true) / 32768;
-      }
-      scheduleBuffer(floatData, sampleRate);
-    }
+  if (isFloat32) {
+    for (let i = 0; i < sampleCount; i++) floatData[i] = view.getFloat32(i * 4, true);
+  } else {
+    for (let i = 0; i < sampleCount; i++) floatData[i] = view.getInt16(i * 2, true) / 32768;
   }
 
-  await waitForPlaybackEnd();
+  scheduleBuffer(floatData, sampleRate);
 }
 
-// ── 工具函数 ──
-
-function mergeBytes(a, b) {
-  if (a.length === 0) return b;
-  const c = new Uint8Array(a.length + b.length);
-  c.set(a);
-  c.set(b, a.length);
-  return c;
-}
+// ── Buffer 调度 ──
 
 function scheduleBuffer(floatData, sampleRate) {
-  if (!audioCtx) return;
+  if (!audioCtx || stopRequested) return;
+
   const buf = audioCtx.createBuffer(1, floatData.length, sampleRate);
-  buf.getChannelData(0).set(floatData);
+  const channelData = buf.getChannelData(0);
+  channelData.set(floatData);
+
+  if (isFirstBuffer) {
+    const fadeSamples = Math.min(Math.floor(sampleRate * 0.01), floatData.length);
+    for (let i = 0; i < fadeSamples; i++) {
+      channelData[i] *= i / fadeSamples;
+    }
+    isFirstBuffer = false;
+  }
 
   const src = audioCtx.createBufferSource();
   src.buffer = buf;
@@ -200,23 +180,43 @@ function scheduleBuffer(floatData, sampleRate) {
   src.onended = () => src.disconnect();
 }
 
+// ── 等待播放结束 ──
+
 function waitForPlaybackEnd() {
   return new Promise(resolve => {
     const check = () => {
-      if (stopRequested || !audioCtx || audioCtx.currentTime >= nextStartTime - 0.1) {
+      if (stopRequested || !audioCtx || audioCtx.currentTime >= nextStartTime) {
         resolve();
       } else {
-        setTimeout(check, 100);
+        setTimeout(check, 50);
       }
     };
     check();
   });
 }
 
+// ── 停止播放（带淡出） ──
+
 function stopAll() {
   stopRequested = true;
-  if (audioCtx && audioCtx.state !== 'closed') {
-    audioCtx.close();
+  if (gainNode && audioCtx && audioCtx.state !== 'closed') {
+    try {
+      gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
+    } catch (e) { /* ignore */ }
+    const ctx = audioCtx;
+    setTimeout(() => { ctx.close().catch(() => {}); }, 60);
     audioCtx = null;
+    gainNode = null;
   }
+}
+
+// ── 工具 ──
+
+function mergeBytes(a, b) {
+  if (a.length === 0) return b;
+  if (b.length === 0) return a;
+  const c = new Uint8Array(a.length + b.length);
+  c.set(a);
+  c.set(b, a.length);
+  return c;
 }

@@ -8,8 +8,7 @@
     "contextMenus",
     "activeTab",
     "scripting",
-    "offscreen",
-    "downloads"
+    "offscreen"
   ],
   "host_permissions": [
     "http://localhost:*/*",
