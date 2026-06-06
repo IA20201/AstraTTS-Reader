@@ -72,7 +72,7 @@ async function handlePlay(settings, text) {
       const resp = await fetch(base + '/audio/speech', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
           'Authorization': `Bearer ${settings.apiKey || 'not-needed'}`
         },
         body: JSON.stringify({
@@ -100,7 +100,7 @@ async function handlePlay(settings, text) {
       const resp = await fetch(base + '/audio/speech', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
           'Authorization': `Bearer ${settings.apiKey || 'not-needed'}`
         },
         body: JSON.stringify({
