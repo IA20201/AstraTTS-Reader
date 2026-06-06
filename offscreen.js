@@ -69,6 +69,7 @@ async function handlePlay(settings, text) {
     } else if (settings.apiMode === 'mimo') {
       // MiMo TTS 模式 — 后端根据音色类型自动路由到对应模型
       const voice = settings.mimoVoice || '冰糖';
+      const useStreaming = settings.mimoStreaming !== false; // 默认 true
       const resp = await fetch(base + '/audio/speech', {
         method: 'POST',
         headers: {
@@ -78,8 +79,8 @@ async function handlePlay(settings, text) {
         body: JSON.stringify({
           input: text,
           voice: voice,
-          response_format: 'pcm',
-          stream: true,
+          response_format: useStreaming ? 'pcm' : 'wav',
+          stream: useStreaming,
           speed: settings.speechSpeed
         })
       });
@@ -95,7 +96,12 @@ async function handlePlay(settings, text) {
           textLength: text.length
         }
       });
-      await playPCM(resp, sampleRate, volume, false);
+      if (useStreaming) {
+        await playPCM(resp, sampleRate, volume, false);
+      } else {
+        const arrayBuffer = await resp.arrayBuffer();
+        await playPCM(new Response(arrayBuffer), sampleRate, volume, false);
+      }
     } else {
       const resp = await fetch(base + '/audio/speech', {
         method: 'POST',

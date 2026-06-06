@@ -156,7 +156,11 @@
       <input type="range" id="volume" min="0" max="1" step="0.05" value="1.0">
       <span class="speed-val" id="volumeVal">1.0</span>
     </div>
-    <div class="hint">流式播放已默认开启</div>
+    <div class="hint">MiMo TTS 默认流式播放，关闭则用非流式</div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer">
+      <input type="checkbox" id="mimoStreaming" checked style="accent-color:#89b4fa">
+      <span style="font-size:12px">流式播放</span>
+    </label>
   </div>
 
   <button id="save">保存设置</button>

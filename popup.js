@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     avatarId: document.getElementById('avatarId'),
     referenceId: document.getElementById('referenceId'),
     mimoVoice: document.getElementById('mimoVoice'),
+    mimoStreaming: document.getElementById('mimoStreaming'),
   };
 
   const modeBadge = document.getElementById('modeBadge');

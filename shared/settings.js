@@ -13,13 +13,14 @@ const DEFAULT_SETTINGS = {
   referenceId: '',
   outputVolume: 1.0,
   // MiMo TTS 专用
-  mimoVoice: '冰糖'
+  mimoVoice: '冰糖',
+  mimoStreaming: true
 };
 
 async function loadSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ['apiMode', 'apiUrl', 'apiKey', 'speechSpeed', 'voice', 'model', 'avatarId', 'referenceId', 'outputVolume', 'mimoVoice'],
+      ['apiMode', 'apiUrl', 'apiKey', 'speechSpeed', 'voice', 'model', 'avatarId', 'referenceId', 'outputVolume', 'mimoVoice', 'mimoStreaming'],
       (data) => {
         if (!data.apiMode) {
           const oldUrl = data.apiUrl || '';
@@ -38,7 +39,8 @@ async function loadSettings() {
           avatarId: data.avatarId || DEFAULT_SETTINGS.avatarId,
           referenceId: data.referenceId || DEFAULT_SETTINGS.referenceId,
           outputVolume: data.outputVolume ?? DEFAULT_SETTINGS.outputVolume,
-          mimoVoice: data.mimoVoice || DEFAULT_SETTINGS.mimoVoice
+          mimoVoice: data.mimoVoice || DEFAULT_SETTINGS.mimoVoice,
+          mimoStreaming: data.mimoStreaming ?? DEFAULT_SETTINGS.mimoStreaming
         });
       }
     );
@@ -66,6 +68,7 @@ async function initForm(elements) {
   if (elements.referenceId) elements.referenceId.value = s.referenceId;
   if (elements.volume)   elements.volume.value = s.outputVolume;
   if (elements.mimoVoice) elements.mimoVoice.value = s.mimoVoice;
+  if (elements.mimoStreaming) elements.mimoStreaming.checked = s.mimoStreaming;
   toggleModeFields(s.apiMode);
   return s;
 }
@@ -101,6 +104,7 @@ function readForm(elements) {
     referenceId: el => el.value.trim(),
     outputVolume: el => parseFloat(el.value || 1.0),
     mimoVoice:   el => el.value.trim(),
+    mimoStreaming: el => el.checked,
   };
   const elMap = {
     apiMode: elements.apiMode,
@@ -113,6 +117,7 @@ function readForm(elements) {
     referenceId: elements.referenceId,
     outputVolume: elements.volume,
     mimoVoice: elements.mimoVoice,
+    mimoStreaming: elements.mimoStreaming,
   };
   for (const [key, fn] of Object.entries(fieldMap)) {
     if (elMap[key]) result[key] = fn(elMap[key]);
