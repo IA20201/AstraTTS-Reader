@@ -79,12 +79,13 @@ async function handlePlay(settings, text) {
           input: text,
           voice: voice,
           response_format: 'pcm',
-          stream: true,
+          stream: false,
           speed: settings.speechSpeed
         })
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const sampleRate = parseInt(resp.headers.get('X-Audio-Sample-Rate')) || 24000;
+      const arrayBuffer = await resp.arrayBuffer();
+      const sampleRate = 24000;
       chrome.runtime.sendMessage({
         action: 'runtime-status',
         data: {
@@ -95,7 +96,7 @@ async function handlePlay(settings, text) {
           textLength: text.length
         }
       });
-      await playPCM(resp, sampleRate, volume, false);
+      await playPCM(new Response(arrayBuffer), sampleRate, volume, false);
     } else {
       const resp = await fetch(base + '/audio/speech', {
         method: 'POST',
