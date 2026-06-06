@@ -80,16 +80,22 @@ async function playFloat32PCM(response, sampleRate, volume) {
   nextStartTime = audioCtx.currentTime;
   const reader = response.body.getReader();
   let residual = new Uint8Array(0);
+  // 积累至少 0.5 秒数据再调度，减少 buffer 数量
+  const minBytes = sampleRate * 4 * 0.5;
 
   while (!stopRequested) {
     const { value, done } = await reader.read();
     if (done) break;
     if (!value) continue;
 
-    let combined = mergeBytes(residual, value);
-    const alignedLen = combined.length - (combined.length % 4);
-    residual = combined.slice(alignedLen);
+    residual = mergeBytes(residual, value);
+    if (!done && residual.length < minBytes) continue;
+
+    const alignedLen = residual.length - (residual.length % 4);
     if (alignedLen === 0) continue;
+    const leftover = residual.slice(alignedLen);
+    const combined = residual;
+    residual = leftover;
 
     const sampleCount = alignedLen / 4;
     const floatData = new Float32Array(sampleCount);
@@ -98,6 +104,19 @@ async function playFloat32PCM(response, sampleRate, volume) {
       floatData[i] = view.getFloat32(i * 4, true);
     }
     scheduleBuffer(floatData, sampleRate);
+  }
+  // 处理剩余数据
+  if (!stopRequested && residual.length >= 4) {
+    const alignedLen = residual.length - (residual.length % 4);
+    if (alignedLen > 0) {
+      const sampleCount = alignedLen / 4;
+      const floatData = new Float32Array(sampleCount);
+      const view = new DataView(residual.buffer, residual.byteOffset, alignedLen);
+      for (let i = 0; i < sampleCount; i++) {
+        floatData[i] = view.getFloat32(i * 4, true);
+      }
+      scheduleBuffer(floatData, sampleRate);
+    }
   }
 
   await waitForPlaybackEnd();
@@ -115,16 +134,21 @@ async function playInt16PCM(response, sampleRate, volume) {
   nextStartTime = audioCtx.currentTime;
   const reader = response.body.getReader();
   let residual = new Uint8Array(0);
+  const minBytes = sampleRate * 2 * 0.5;
 
   while (!stopRequested) {
     const { value, done } = await reader.read();
     if (done) break;
     if (!value) continue;
 
-    let combined = mergeBytes(residual, value);
-    const alignedLen = combined.length - (combined.length % 2);
-    residual = combined.slice(alignedLen);
+    residual = mergeBytes(residual, value);
+    if (!done && residual.length < minBytes) continue;
+
+    const alignedLen = residual.length - (residual.length % 2);
     if (alignedLen === 0) continue;
+    const leftover = residual.slice(alignedLen);
+    const combined = residual;
+    residual = leftover;
 
     const sampleCount = alignedLen / 2;
     const floatData = new Float32Array(sampleCount);
@@ -133,6 +157,18 @@ async function playInt16PCM(response, sampleRate, volume) {
       floatData[i] = view.getInt16(i * 2, true) / 32768;
     }
     scheduleBuffer(floatData, sampleRate);
+  }
+  if (!stopRequested && residual.length >= 2) {
+    const alignedLen = residual.length - (residual.length % 2);
+    if (alignedLen > 0) {
+      const sampleCount = alignedLen / 2;
+      const floatData = new Float32Array(sampleCount);
+      const view = new DataView(residual.buffer, residual.byteOffset, alignedLen);
+      for (let i = 0; i < sampleCount; i++) {
+        floatData[i] = view.getInt16(i * 2, true) / 32768;
+      }
+      scheduleBuffer(floatData, sampleRate);
+    }
   }
 
   await waitForPlaybackEnd();
