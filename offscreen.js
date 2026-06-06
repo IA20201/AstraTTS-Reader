@@ -25,17 +25,14 @@ async function handlePlay(settings, text) {
 
   try {
     if (settings.apiMode === 'astra') {
-      // AstraTTS: POST 流式 Float32 PCM
-      const resp = await fetch(base + '/api/tts/predict-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          speed: settings.speechSpeed,
-          ...(settings.avatarId && { avatarId: settings.avatarId }),
-          ...(settings.referenceId && { referenceId: settings.referenceId })
-        })
+      // AstraTTS: GET 流式 Float32 PCM
+      const params = new URLSearchParams({
+        text,
+        speed: settings.speechSpeed,
+        ...(settings.avatarId && { avatarId: settings.avatarId }),
+        ...(settings.referenceId && { referenceId: settings.referenceId })
       });
+      const resp = await fetch(base + '/api/tts/predict-stream?' + params.toString());
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const sampleRate = parseInt(resp.headers.get('X-Audio-Sample-Rate')) || 32000;
       await playFloat32PCM(resp, sampleRate, volume);
