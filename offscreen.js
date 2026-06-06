@@ -85,7 +85,7 @@ async function handlePlay(settings, text) {
         })
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const sampleRate = 24000;
+      const sampleRate = parseInt(resp.headers.get('X-Audio-Sample-Rate')) || 24000;
       chrome.runtime.sendMessage({
         action: 'runtime-status',
         data: {
@@ -100,7 +100,9 @@ async function handlePlay(settings, text) {
         await playPCM(resp, sampleRate, volume, false);
       } else {
         const arrayBuffer = await resp.arrayBuffer();
-        await playPCM(new Response(arrayBuffer), sampleRate, volume, false);
+        // 跳过 WAV 文件头（44 字节 RIFF 头）
+        const pcmData = arrayBuffer.byteLength > 44 ? arrayBuffer.slice(44) : arrayBuffer;
+        await playPCM(new Response(pcmData), sampleRate, volume, false);
       }
     } else {
       const resp = await fetch(base + '/audio/speech', {

@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateBadge(mode);
     if (mode === 'astra' && el.apiUrl.value.includes('/v1')) {
       el.apiUrl.value = el.apiUrl.value.replace(/\/v1\/?$/, '');
-    } else if ((mode === 'openai' || mode === 'mimo') && !el.apiUrl.value.includes('/v1')) {
+    } else if (mode === 'openai' && !el.apiUrl.value.includes('/v1')) {
       el.apiUrl.value = el.apiUrl.value.replace(/\/+$/, '') + '/v1';
     }
   };
