@@ -42,7 +42,7 @@ chrome.contextMenus.onClicked.addListener((info) => {
 async function getSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ['apiMode', 'apiUrl', 'apiKey', 'speechSpeed', 'voice', 'model', 'avatarId', 'referenceId', 'outputVolume'],
+      ['apiMode', 'apiUrl', 'apiKey', 'speechSpeed', 'voice', 'model', 'avatarId', 'referenceId', 'outputVolume', 'mimoVoice', 'mimoStreaming'],
       (data) => {
         if (!data.apiMode) {
           const oldUrl = data.apiUrl || '';
@@ -58,7 +58,9 @@ async function getSettings() {
           model:       data.model || 'tts-1',
           avatarId:    data.avatarId || '',
           referenceId: data.referenceId || '',
-          outputVolume: data.outputVolume ?? 1.0
+          outputVolume: data.outputVolume ?? 1.0,
+          mimoVoice:   data.mimoVoice || '冰糖',
+          mimoStreaming: data.mimoStreaming ?? true
         });
       }
     );
