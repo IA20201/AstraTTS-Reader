@@ -35,6 +35,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       el.apiUrl.value = el.apiUrl.value.replace(/\/v1\/?$/, '');
     } else if (mode === 'openai' && !el.apiUrl.value.includes('/v1')) {
       el.apiUrl.value = el.apiUrl.value.replace(/\/+$/, '') + '/v1';
+    } else if (mode === 'mimo') {
+      // MiMo TTS 默认端口 18900
+      if (!el.apiUrl.value || el.apiUrl.value === 'http://localhost:5000' || el.apiUrl.value === 'http://localhost:5000/v1') {
+        el.apiUrl.value = 'http://localhost:18900/v1';
+      }
     }
   };
 
