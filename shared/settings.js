@@ -49,40 +49,6 @@ async function saveSettings(settings) {
 }
 
 /**
- * 根据 API 模式构建请求参数（标准/下载）
- */
-function buildRequest(settings, text, format = 'wav') {
-  const base = settings.apiUrl.replace(/\/+$/, '');
-  if (settings.apiMode === 'astra') {
-    return {
-      endpoint: base + '/api/tts/predict',
-      payload: {
-        text,
-        speed: settings.speechSpeed,
-        ...(settings.avatarId && { avatarId: settings.avatarId }),
-        ...(settings.referenceId && { referenceId: settings.referenceId })
-      },
-      headers: { 'Content-Type': 'application/json' }
-    };
-  } else {
-    return {
-      endpoint: base + '/audio/speech',
-      payload: {
-        model: settings.model,
-        input: text,
-        voice: settings.voice,
-        response_format: format,
-        speed: settings.speechSpeed
-      },
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey}`
-      }
-    };
-  }
-}
-
-/**
  * 初始化 UI 表单
  */
 async function initForm(elements) {
@@ -113,18 +79,34 @@ function toggleModeFields(mode) {
 }
 
 /**
- * 从表单读取设置
+ * 从表单读取设置（只收集 UI 中实际存在的字段，避免覆盖其他页面的配置）
  */
 function readForm(elements) {
-  return {
-    apiMode:    elements.apiMode?.value || 'astra',
-    apiUrl:     (elements.apiUrl?.value || '').trim(),
-    apiKey:     (elements.apiKey?.value || '').trim(),
-    speechSpeed: parseFloat(elements.speed?.value || 1.0),
-    voice:      (elements.voice?.value || '').trim(),
-    model:      (elements.model?.value || '').trim(),
-    avatarId:   (elements.avatarId?.value || '').trim(),
-    referenceId:(elements.referenceId?.value || '').trim(),
-    outputVolume: parseFloat(elements.volume?.value || 1.0)
+  const result = {};
+  const fieldMap = {
+    apiMode:     el => el.value || 'astra',
+    apiUrl:      el => el.value.trim(),
+    apiKey:      el => el.value.trim(),
+    speechSpeed: el => parseFloat(el.value || 1.0),
+    voice:       el => el.value.trim(),
+    model:       el => el.value.trim(),
+    avatarId:    el => el.value.trim(),
+    referenceId: el => el.value.trim(),
+    outputVolume: el => parseFloat(el.value || 1.0),
   };
+  const elMap = {
+    apiMode: elements.apiMode,
+    apiUrl: elements.apiUrl,
+    apiKey: elements.apiKey,
+    speechSpeed: elements.speed,
+    voice: elements.voice,
+    model: elements.model,
+    avatarId: elements.avatarId,
+    referenceId: elements.referenceId,
+    outputVolume: elements.volume,
+  };
+  for (const [key, fn] of Object.entries(fieldMap)) {
+    if (elMap[key]) result[key] = fn(elMap[key]);
+  }
+  return result;
 }
