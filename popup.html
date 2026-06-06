@@ -26,6 +26,7 @@
       font-weight: 600;
     }
     .badge.astra { background: rgba(137,180,250,.2); color: #89b4fa; }
+    .badge.mimo { background: rgba(166,227,161,.2); color: #a6e3a1; }
     .badge.openai { background: rgba(203,166,247,.2); color: #cba6f7; }
     label {
       display: block;
@@ -90,6 +91,7 @@
   <label>API 模式</label>
   <select id="apiMode">
     <option value="astra">AstraTTS 原生</option>
+    <option value="mimo">MiMo TTS</option>
     <option value="openai">OpenAI 兼容</option>
   </select>
 
@@ -114,6 +116,32 @@
   <div class="openai-field" style="display:none">
     <label>Voice</label>
     <input type="text" id="voice" placeholder="voice name">
+  </div>
+
+  <!-- MiMo TTS 字段 -->
+  <div class="mimo-field" style="display:none">
+    <label>音色</label>
+    <select id="mimoVoice">
+      <optgroup label="内置音色">
+        <option value="冰糖">冰糖</option>
+        <option value="茉莉">茉莉</option>
+        <option value="苏打">苏打</option>
+        <option value="白桦">白桦</option>
+        <option value="Mia">Mia</option>
+        <option value="Chloe">Chloe</option>
+        <option value="Milo">Milo</option>
+        <option value="Dean">Dean</option>
+        <option value="mimo_default">mimo_default</option>
+      </optgroup>
+      <optgroup label="声音克隆">
+        <option value="黑贞">黑贞</option>
+        <option value="哈尔滨-温柔">哈尔滨-温柔</option>
+        <option value="哈尔滨-日常">哈尔滨-日常</option>
+        <option value="卡提希娅">卡提希娅</option>
+        <option value="辰星">辰星</option>
+      </optgroup>
+    </select>
+    <div class="hint">后端根据音色类型自动选择模型（内置/克隆/设计）</div>
   </div>
 
   <div class="section">

@@ -11,13 +11,15 @@ const DEFAULT_SETTINGS = {
   model: 'tts-1',
   avatarId: '',
   referenceId: '',
-  outputVolume: 1.0
+  outputVolume: 1.0,
+  // MiMo TTS 专用
+  mimoVoice: '冰糖'
 };
 
 async function loadSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ['apiMode', 'apiUrl', 'apiKey', 'speechSpeed', 'voice', 'model', 'avatarId', 'referenceId', 'outputVolume'],
+      ['apiMode', 'apiUrl', 'apiKey', 'speechSpeed', 'voice', 'model', 'avatarId', 'referenceId', 'outputVolume', 'mimoVoice'],
       (data) => {
         if (!data.apiMode) {
           const oldUrl = data.apiUrl || '';
@@ -35,7 +37,8 @@ async function loadSettings() {
           model: data.model || DEFAULT_SETTINGS.model,
           avatarId: data.avatarId || DEFAULT_SETTINGS.avatarId,
           referenceId: data.referenceId || DEFAULT_SETTINGS.referenceId,
-          outputVolume: data.outputVolume ?? DEFAULT_SETTINGS.outputVolume
+          outputVolume: data.outputVolume ?? DEFAULT_SETTINGS.outputVolume,
+          mimoVoice: data.mimoVoice || DEFAULT_SETTINGS.mimoVoice
         });
       }
     );
@@ -62,6 +65,7 @@ async function initForm(elements) {
   if (elements.avatarId) elements.avatarId.value = s.avatarId;
   if (elements.referenceId) elements.referenceId.value = s.referenceId;
   if (elements.volume)   elements.volume.value = s.outputVolume;
+  if (elements.mimoVoice) elements.mimoVoice.value = s.mimoVoice;
   toggleModeFields(s.apiMode);
   return s;
 }
@@ -75,6 +79,9 @@ function toggleModeFields(mode) {
   });
   document.querySelectorAll('.openai-field').forEach(el => {
     el.style.display = mode === 'openai' ? '' : 'none';
+  });
+  document.querySelectorAll('.mimo-field').forEach(el => {
+    el.style.display = mode === 'mimo' ? '' : 'none';
   });
 }
 
@@ -93,6 +100,7 @@ function readForm(elements) {
     avatarId:    el => el.value.trim(),
     referenceId: el => el.value.trim(),
     outputVolume: el => parseFloat(el.value || 1.0),
+    mimoVoice:   el => el.value.trim(),
   };
   const elMap = {
     apiMode: elements.apiMode,
@@ -104,6 +112,7 @@ function readForm(elements) {
     avatarId: elements.avatarId,
     referenceId: elements.referenceId,
     outputVolume: elements.volume,
+    mimoVoice: elements.mimoVoice,
   };
   for (const [key, fn] of Object.entries(fieldMap)) {
     if (elMap[key]) result[key] = fn(elMap[key]);

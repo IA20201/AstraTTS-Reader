@@ -66,6 +66,36 @@ async function handlePlay(settings, text) {
         }
       });
       await playPCM(resp, sampleRate, volume, true);
+    } else if (settings.apiMode === 'mimo') {
+      // MiMo TTS 模式 — 后端根据音色类型自动路由到对应模型
+      const voice = settings.mimoVoice || '冰糖';
+      const resp = await fetch(base + '/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.apiKey || 'not-needed'}`
+        },
+        body: JSON.stringify({
+          input: text,
+          voice: voice,
+          response_format: 'pcm',
+          stream: true,
+          speed: settings.speechSpeed
+        })
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const sampleRate = parseInt(resp.headers.get('X-Audio-Sample-Rate')) || 24000;
+      chrome.runtime.sendMessage({
+        action: 'runtime-status',
+        data: {
+          apiMode: 'mimo',
+          mimoVoice: voice,
+          speed: settings.speechSpeed,
+          volume, sampleRate,
+          textLength: text.length
+        }
+      });
+      await playPCM(resp, sampleRate, volume, false);
     } else {
       const resp = await fetch(base + '/audio/speech', {
         method: 'POST',

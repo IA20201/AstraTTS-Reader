@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     volume:   document.getElementById('volume'),
     avatarId: document.getElementById('avatarId'),
     referenceId: document.getElementById('referenceId'),
+    mimoVoice: document.getElementById('mimoVoice'),
   };
 
   const modeBadge = document.getElementById('modeBadge');
@@ -31,7 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateBadge(mode);
     if (mode === 'astra' && el.apiUrl.value.includes('/v1')) {
       el.apiUrl.value = el.apiUrl.value.replace(/\/v1\/?$/, '');
-    } else if (mode === 'openai' && !el.apiUrl.value.includes('/v1')) {
+    } else if ((mode === 'openai' || mode === 'mimo') && !el.apiUrl.value.includes('/v1')) {
       el.apiUrl.value = el.apiUrl.value.replace(/\/+$/, '') + '/v1';
     }
   };
@@ -63,6 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       runtimeSection.style.display = '';
       runtimeInfo.innerHTML = [
         d.avatarId && `音色: <b>${d.avatarId}</b> / ${d.referenceId}`,
+        d.mimoVoice && `音色: <b>${d.mimoVoice}</b>`,
         d.speed && `语速: ${d.speed}x`,
         d.textLength && `字数: ${d.textLength}`,
         d.sampleRate && `采样率: ${d.sampleRate} Hz`,
@@ -75,7 +77,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   setInterval(updateRuntime, 1000);
 
   function updateBadge(mode) {
-    modeBadge.textContent = mode === 'astra' ? 'AstraTTS' : 'OpenAI';
+    const labels = { astra: 'AstraTTS', mimo: 'MiMo TTS', openai: 'OpenAI' };
+    modeBadge.textContent = labels[mode] || mode;
     modeBadge.className = 'badge ' + mode;
   }
 });
